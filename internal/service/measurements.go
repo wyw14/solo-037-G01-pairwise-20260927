@@ -18,9 +18,12 @@ import (
 
 // MeasuredRun contains observations supplied by an operator, unlike the
 // deterministic diagnostic scenario used by the legacy equipment page.
+// ModelConfig pins the ship model configuration version in force when the
+// run was created, so later configuration changes do not rewrite history.
 type MeasuredRun struct {
-	Operation model.Operation  `json:"operation"`
-	Evidence  []model.Evidence `json:"evidence"`
+	Operation   model.Operation    `json:"operation"`
+	ModelConfig *model.ModelConfig `json:"model_config,omitempty"`
+	Evidence    []model.Evidence   `json:"evidence"`
 }
 
 type MeasurementInput struct {
@@ -71,6 +74,10 @@ func OpenMeasurementArchive(directory string) (*MeasurementArchive, error) {
 
 func cloneMeasuredRun(value MeasuredRun) MeasuredRun {
 	value.Evidence = append([]model.Evidence(nil), value.Evidence...)
+	if value.ModelConfig != nil {
+		config := *value.ModelConfig
+		value.ModelConfig = &config
+	}
 	return value
 }
 
@@ -104,7 +111,7 @@ func (a *MeasurementArchive) commit(next map[model.RunID]MeasuredRun) error {
 	return nil
 }
 
-func (a *MeasurementArchive) Create(name, modelName, section, carriage string) (MeasuredRun, error) {
+func (a *MeasurementArchive) Create(name, modelName, section, carriage string, config *model.ModelConfig) (MeasuredRun, error) {
 	if strings.TrimSpace(name) == "" || strings.TrimSpace(modelName) == "" || strings.TrimSpace(section) == "" || strings.TrimSpace(carriage) == "" {
 		return MeasuredRun{}, errors.New("name, model, section and carriage are required")
 	}
@@ -112,6 +119,10 @@ func (a *MeasurementArchive) Create(name, modelName, section, carriage string) (
 	defer a.mu.Unlock()
 	operation := model.NewOperation(name, modelName, section, carriage, time.Now().UTC())
 	value := MeasuredRun{Operation: operation, Evidence: []model.Evidence{}}
+	if config != nil {
+		pinned := *config
+		value.ModelConfig = &pinned
+	}
 	next := make(map[model.RunID]MeasuredRun, len(a.runs)+1)
 	for id, run := range a.runs {
 		next[id] = run
@@ -191,7 +202,11 @@ func (a *MeasurementArchive) Analyze(id model.RunID) (MeasurementAnalysis, error
 }
 
 func (r *Runtime) CreateMeasuredRun(name, modelName, section, carriage string) (MeasuredRun, error) {
-	return r.Measurements.Create(name, modelName, section, carriage)
+	var pinned *model.ModelConfig
+	if config, ok := r.Registry.CurrentConfig(strings.TrimSpace(modelName)); ok {
+		pinned = &config
+	}
+	return r.Measurements.Create(name, modelName, section, carriage, pinned)
 }
 
 func (r *Runtime) RecordMeasurement(id model.RunID, input MeasurementInput) (model.Evidence, error) {

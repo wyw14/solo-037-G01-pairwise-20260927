@@ -14,7 +14,7 @@ func TestOperatorMeasurementsPersistAndAnalyzeSuppliedValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	run, err := a.Create("test A", "hull X", "section-a", "carriage-1")
+	run, err := a.Create("test A", "hull X", "section-a", "carriage-1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestOperatorMeasurementRejectsInvalidAndUnknownRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	run, err := a.Create("test B", "hull X", "section-a", "carriage-1")
+	run, err := a.Create("test B", "hull X", "section-a", "carriage-1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
